@@ -1,7 +1,7 @@
 package tcpserver
 
 import (
-	"Net"
+	"net"
 	"fmt"
 	"io"
 )
