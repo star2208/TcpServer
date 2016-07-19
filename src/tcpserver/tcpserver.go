@@ -1,8 +1,9 @@
 package tcpserver
 
 import (
-	//	"Net"
+	"Net"
 	"fmt"
+	"io"
 )
 
 // TcpServer 类，虚拟一个Socket服务器
@@ -22,29 +23,36 @@ func NewTcpServer(name string, listen_port int16) *TcpServer {
 	return &TcpServer{name, listen_port, nil, nil}
 }
 
+func (s *TcpServer) handleConnection(conn net.Conn) {
+	io.Copy(conn, conn)
+	// Shut down the connection.
+	conn.Close()
+}
+
 func (s *TcpServer) Listen(stop_listener, listener_is_stopped chan bool) (err error) {
+
+	//ln, err := net.Listen("tcp", ":"+string(s.ListenPort))
+	ln, err := net.Listen("tcp", ":8888")
+	_, _ = ln, err
 	/*
-		listener, err := net.Listen("tcp", ":8888")
+
 		if err != nil {
-			fmt.Println("listen error:", err)
-			return
+			// handle error
+			fmt.Println("Started Listener fail.", err.Error())
 		}
-		listener.SetDeadline(time.now().Add(1*time.Second))
 	*/
-	fmt.Println("Listener Started.")
+
+	fmt.Println("Listener Started...")
 
 	/*
-	   	for {
-	   		c, err := listener.Accept()
-	   		if err != nil {
-	   			fmt.Println("accept error:", err)
-	   			break
-	   		}
-	   		// start a new goroutine to handle
-	   		// the new connection.
-	      		go handleConn(c)
-	   	}
-	*/
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				// handle error
+			}
+			go s.handleConnection(conn)
+		}*/
+
 	_ = <-s.stop_listener
 	fmt.Println("Listener Stopped.")
 	s.listener_is_stopped <- true

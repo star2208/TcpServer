@@ -8,7 +8,7 @@ import (
 	"tcpserver"
 )
 
-func wait_ctrl_c(tcp_server *tcpserver.TcpServer) {
+func wait_ctrl_c_and_stop(tcp_server *tcpserver.TcpServer) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
@@ -27,5 +27,5 @@ func main() {
 	tcp_server := tcpserver.NewTcpServer("virtual_tcp_server", 8888)
 	tcp_server.Start()
 
-	wait_ctrl_c(tcp_server)
+	wait_ctrl_c_and_stop(tcp_server)
 }
