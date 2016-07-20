@@ -1,9 +1,11 @@
 package tcpserver
 
 import (
-	"net"
 	"fmt"
 	"io"
+	"net"
+	"strconv"
+	"time"
 )
 
 // TcpServer 类，虚拟一个Socket服务器
@@ -31,29 +33,44 @@ func (s *TcpServer) handleConnection(conn net.Conn) {
 
 func (s *TcpServer) Listen(stop_listener, listener_is_stopped chan bool) (err error) {
 
-	//ln, err := net.Listen("tcp", ":"+string(s.ListenPort))
-	ln, err := net.Listen("tcp", ":8888")
-	_, _ = ln, err
-	/*
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", ":"+strconv.Itoa(int(s.ListenPort)))
+	if err != nil {
+		fmt.Println("Started Listener fail.", err.Error())
+	}
 
-		if err != nil {
-			// handle error
-			fmt.Println("Started Listener fail.", err.Error())
+	tcplistener, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		fmt.Println("Started Listener fail.", err.Error())
+	}
+	fmt.Println("Listener Started...", "Port:", tcpAddr.Port)
+
+	isStop := false
+	for {
+
+		select {
+		case <-s.stop_listener:
+			isStop = true
+		default:
 		}
-	*/
 
-	fmt.Println("Listener Started...")
+		if isStop {
+			break
+		}
 
-	/*
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				// handle error
+		tcplistener.SetDeadline(time.Now().Add(1e9))
+
+		conn, err := tcplistener.Accept()
+		if err != nil {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				//fmt.Println(err)
+				continue
 			}
+			fmt.Println(err)
+		} else {
 			go s.handleConnection(conn)
-		}*/
+		}
+	}
 
-	_ = <-s.stop_listener
 	fmt.Println("Listener Stopped.")
 	s.listener_is_stopped <- true
 
