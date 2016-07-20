@@ -30,14 +30,16 @@ func NewTcpServer(name string, listen_port int16) *TcpServer {
 }
 
 func (s *TcpServer) handleConnection(conn net.Conn) {
-	defer conn.Close()
+
 	s.waitGroup.Add(1)
 	defer s.waitGroup.Done()
+	defer conn.Close()
+	defer fmt.Println("disconnecting", conn.RemoteAddr())
 
 	for {
 		select {
 		case <-s.stop_server:
-			fmt.Println("disconnecting", conn.RemoteAddr())
+
 			return
 		default:
 		}
@@ -99,12 +101,12 @@ func (s *TcpServer) Listen() (err error) {
 			}
 			fmt.Println(err)
 		} else {
+			fmt.Println(conn.RemoteAddr(), "connected.")
 			go s.handleConnection(conn)
 		}
 	}
 
 	fmt.Println("Listener Stopped.")
-
 	return
 }
 
