@@ -2,9 +2,9 @@ package tcpserver
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -14,24 +14,55 @@ type TcpServer struct {
 	Name string
 	// 监听端口
 	ListenPort int16
-	// 停止监听
-	stop_listener chan bool
-	// 监听已经停止
-	listener_is_stopped chan bool
+	// 停止服务
+	stop_server chan bool
+	// 服务已停止
+	waitGroup *sync.WaitGroup
 }
 
 func NewTcpServer(name string, listen_port int16) *TcpServer {
 	fmt.Println("Create TcpServer name:", name, "port: ", listen_port)
-	return &TcpServer{name, listen_port, nil, nil}
+	return &TcpServer{
+		Name:        name,
+		ListenPort:  listen_port,
+		stop_server: make(chan bool),
+		waitGroup:   &sync.WaitGroup{}}
 }
 
 func (s *TcpServer) handleConnection(conn net.Conn) {
-	io.Copy(conn, conn)
-	// Shut down the connection.
-	conn.Close()
+	defer conn.Close()
+	s.waitGroup.Add(1)
+	defer s.waitGroup.Done()
+
+	for {
+		select {
+		case <-s.stop_server:
+			fmt.Println("disconnecting", conn.RemoteAddr())
+			return
+		default:
+		}
+
+		conn.SetDeadline(time.Now().Add(1e9))
+
+		buf := make([]byte, 4096)
+		if _, err := conn.Read(buf); nil != err {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				continue
+			}
+			fmt.Println(err)
+			return
+		}
+
+		if _, err := conn.Write(buf); nil != err {
+			fmt.Println(err)
+			return
+		}
+	}
 }
 
-func (s *TcpServer) Listen(stop_listener, listener_is_stopped chan bool) (err error) {
+func (s *TcpServer) Listen() (err error) {
+	s.waitGroup.Add(1)
+	defer s.waitGroup.Done()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", ":"+strconv.Itoa(int(s.ListenPort)))
 	if err != nil {
@@ -43,12 +74,13 @@ func (s *TcpServer) Listen(stop_listener, listener_is_stopped chan bool) (err er
 		fmt.Println("Started Listener fail.", err.Error())
 	}
 	fmt.Println("Listener Started...", "Port:", tcpAddr.Port)
+	defer tcplistener.Close()
 
 	isStop := false
 	for {
 
 		select {
-		case <-s.stop_listener:
+		case <-s.stop_server:
 			isStop = true
 		default:
 		}
@@ -72,25 +104,20 @@ func (s *TcpServer) Listen(stop_listener, listener_is_stopped chan bool) (err er
 	}
 
 	fmt.Println("Listener Stopped.")
-	s.listener_is_stopped <- true
 
 	return
 }
 
 func (s *TcpServer) Start() (err error) {
 	fmt.Println("TcpServer", s.Name, "started.")
-
-	s.stop_listener = make(chan bool)
-	s.listener_is_stopped = make(chan bool)
-
-	go s.Listen(s.stop_listener, s.listener_is_stopped)
-
+	go s.Listen()
 	return nil
 }
 
 func (s *TcpServer) Stop() (err error) {
-	s.stop_listener <- true
-	<-s.listener_is_stopped
+	close(s.stop_server)
+	s.waitGroup.Wait()
+
 	fmt.Println("TcpServer", s.Name, "stoped.")
 	return nil
 }
